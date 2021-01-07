@@ -46,6 +46,23 @@ controls = dbc.Card(
             ],
             className="mb-2",
         ),
+        dbc.InputGroup(
+            [
+                dbc.InputGroupAddon("Data type", addon_type="prepend"),
+                dbc.RadioItems(
+                    options=[
+                        {"label": "Large", "value": 'L'},
+                        {"label": "Small", "value": 'S'},
+                    ],
+                    value='L',
+                    id="data-type",
+                    inline=True,
+                    className="ml-2"
+                ),
+            ],
+            className="mb-2",
+        ),
+
         dbc.Button("Generate", id="generate-button", className="mr-2"),
     ],
     body=True, className="mb-2"
@@ -69,6 +86,36 @@ fig_card = dbc.Card(
         #     switch=True,
         # ),
         dcc.Graph(id='time-plot')
+    ],
+    className="mb-2"
+)
+
+fig_wind_card = dbc.Card(
+    [
+        # dbc.Checklist(
+        #     options=[
+        #         {"label": "More details", "value": "time_series"},
+        #     ],
+        #     value=[],
+        #     id="switches-input",
+        #     switch=True,
+        # ),
+        dcc.Graph(id='wind-plot')
+    ],
+    className="mb-2"
+)
+
+fig_prec_card = dbc.Card(
+    [
+        # dbc.Checklist(
+        #     options=[
+        #         {"label": "More details", "value": "time_series"},
+        #     ],
+        #     value=[],
+        #     id="switches-input",
+        #     switch=True,
+        # ),
+        dcc.Graph(id='prec-plot')
     ],
     className="mb-2"
 )
@@ -120,17 +167,17 @@ app.layout = dbc.Container(
                 dbc.Col(
                     [
                     dbc.Spinner(fig_card),
-                    help_card
+                    dbc.Spinner(fig_wind_card),
+                    dbc.Spinner(fig_prec_card),
                     ],
                  sm=12, md=12, lg=7, align='center'),
             ], justify="center",
         ),
 
-    # html.Div(id='intermediate-value', style={'display': 'none'}),
-    # html.Div(id='radar-data-2', style={'display': 'none'})
     ],
     fluid=True,
 )
+
 
 
 # generate map plot at loading AND when the location is updated
@@ -160,9 +207,9 @@ def create_coords_and_map(n_clicks, from_address):
 @app.callback(
     Output("time-plot", "figure"),
     [Input("generate-button", "n_clicks")],
-    [State("locations", "value")]
+    [State("locations", "value"), State("data-type", "value")]
 )
-def func(n_clicks, from_address):
+def func(n_clicks, from_address, data_type):
     if n_clicks is None:
         return utils.make_fig_time(None)
     else:
@@ -173,12 +220,60 @@ def func(n_clicks, from_address):
             else:
                 sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
 
-            df = get_data(sel_station.WMO_ID.item())
+            df = get_data(sel_station.WMO_ID.item(), data_type[0])
             fig = utils.make_fig_time(df)
 
             return fig
         else:
             return utils.make_fig_time(None)
+
+
+@app.callback(
+    Output("wind-plot", "figure"),
+    [Input("generate-button", "n_clicks")],
+    [State("locations", "value"), State("data-type", "value")]
+)
+def func2(n_clicks, from_address, data_type):
+    if n_clicks is None:
+        return utils.make_fig_wind(None)
+    else:
+        if from_address is not None:
+            mosmix_stations = get_stations()
+            if 'value' in from_address:
+                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
+            else:
+                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
+
+            df = get_data(sel_station.WMO_ID.item(), data_type[0])
+            fig = utils.make_fig_wind(df)
+
+            return fig
+        else:
+            return utils.make_fig_wind(None)
+
+
+@app.callback(
+    Output("prec-plot", "figure"),
+    [Input("generate-button", "n_clicks")],
+    [State("locations", "value"), State("data-type", "value")]
+)
+def func3(n_clicks, from_address, data_type):
+    if n_clicks is None:
+        return utils.make_fig_prec(None)
+    else:
+        if from_address is not None:
+            mosmix_stations = get_stations()
+            if 'value' in from_address:
+                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
+            else:
+                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
+
+            df = get_data(sel_station.WMO_ID.item(), data_type[0])
+            fig = utils.make_fig_prec(df)
+
+            return fig
+        else:
+            return utils.make_fig_prec(None)
 
 
 @app.callback(
@@ -221,11 +316,16 @@ def update_location(location):
         raise dash.exceptions.PreventUpdate
 
 
-#@cache.memoize(1800)
-def get_data(station):
+@cache.memoize(1800)
+def get_data(station, data_type):
+    if data_type == 'L':
+        mosmix_type = utils.DWDMosmixType.LARGE
+    elif data_type == 'S':
+        mosmix_type = utils.DWDMosmixType.SMALL
+
     mosmix = utils.DWDMosmixData(
         station_ids=[station],
-        mosmix_type=utils.DWDMosmixType.LARGE,
+        mosmix_type=mosmix_type,
         humanize_parameters=True,
         tidy_data=True
     )
@@ -243,6 +343,14 @@ def get_data(station):
               'TEMPERATURE_AIR_MIN_200', 'TEMPERATURE_AIR_005', 'TEMPERATURE_AIR_MIN_005_LAST_12H',
               "TEMPERATURE_AIR_200_LAST_24H"]
     df.loc[df.PARAMETER.isin(params), 'VALUE'] = df.loc[df.PARAMETER.isin(params), 'VALUE'] - 273.15
+    # 
+    params = ['WIND_SPEED', 'WIND_GUST_MAX_LAST_1H', 'WIND_GUST_MAX_LAST_3H',
+              'WIND_GUST_MAX_LAST_12H']
+    df.loc[df.PARAMETER.isin(params), 'VALUE'] = df.loc[df.PARAMETER.isin(params), 'VALUE'] * 3.6
+    #
+    df.loc[df.PARAMETER == 'PRESSURE_AIR_SURFACE_REDUCED', 'VALUE'] = \
+                df.loc[df.PARAMETER == 'PRESSURE_AIR_SURFACE_REDUCED', 'VALUE'] / 100.
+
     return df
 
 

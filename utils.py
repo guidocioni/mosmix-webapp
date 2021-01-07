@@ -11,7 +11,7 @@ import dash_leaflet as dl
 import dash_html_components as html
 from wetterdienst.dwd.forecasts.stations import metadata_for_forecasts
 from wetterdienst.dwd.forecasts import DWDMosmixData, DWDMosmixType
-
+from PIL import Image
 
 apiURL = "https://api.mapbox.com/directions/v5/mapbox"
 apiKey = os.environ['MAPBOX_KEY']
@@ -20,6 +20,76 @@ apiKey = os.environ['MAPBOX_KEY']
 mapURL = 'https://api.mapbox.com/styles/v1/mapbox/dark-v10/tiles/{z}/{x}/{y}{r}?access_token=' + apiKey
 attribution = '© <a href="https://www.mapbox.com/feedback/">Mapbox</a> © <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
+folder_glyph = 'yrno_png/'
+WMO_GLYPH_LOOKUP_PNG = {
+        '0': '01',
+        '1': '02',
+        '2': '02',
+        '3': '04',
+        '45': '15',
+        '51': '40',
+        '55': '41',
+        '57': '43',
+        '63': '09',
+        '66': '12',
+        '71': '49',
+        '75': '45',
+        '80': '06',
+        '82': '11',
+        '86': '34',
+        '96': '32',
+        '48': '15',
+        '53': '05',
+        '56': '07',
+        '61': '05',
+        '65': '10',
+        '67': '43',
+        '73': '49',
+        '77': '48',
+        '81': '11',
+        '85': '33',
+        '95': '22'
+}
+
+
+def get_weather_icons(ww, time):
+    """
+    Get the path to a png given the weather representation 
+    """
+    weather = []
+    for w in ww.values:
+        if w.astype(int).astype(str) in WMO_GLYPH_LOOKUP_PNG:
+            weather.append(WMO_GLYPH_LOOKUP_PNG[w.astype(int).astype(str)])
+        else:
+            weather.append('empty')
+    weather_icons = []
+    for date, weath in zip(time, weather):
+        if date.hour >= 6 and date.hour <= 18:
+            add_string='d'
+        elif date.hour >=0 and date.hour < 6:
+            add_string='n'
+        elif date.hour >18 and date.hour < 24:
+            add_string='n'
+
+        pngfile=folder_glyph+'%s.png' % (weath+add_string)
+        if os.path.isfile(pngfile):
+            weather_icons.append({'time': date,'icon': pngfile})
+        else:
+            pngfile=folder_glyph+'%s.png' % weath
+            weather_icons.append({'time': date,'icon': pngfile})
+
+    return(weather_icons)
+
+
+def wind_components(speed, wdir):
+    '''Get wind components from speed and direction.'''
+
+    wdir = np.deg2rad(wdir)
+
+    u = speed * np.sin(wdir)
+    v = speed * np.cos(wdir)
+
+    return u, v
 
 def convert_timezone(dt_from, from_tz='utc', to_tz='Europe/Berlin'):
     """
@@ -111,32 +181,49 @@ def make_fig_time(df):
     if df is not None:
         xaxis = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'DATE']
 
-        trace_temp = go.Scatter(name='2m Temp',
+        plot_traces = []
+
+        trace_temp = go.Scatter(name='Temp',
                          x=xaxis,
                          y=df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'],
                          mode="lines",
                          showlegend=True,
                          line=dict(color='rgb(179, 179, 179)', width=3))
 
-        tperr = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'].values+ \
-                df.loc[df.PARAMETER.isin(['ERROR_ABSOLUTE_TEMPERATURE_AIR_200']), 'VALUE'].values
-        tmerr = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'].values- \
-                df.loc[df.PARAMETER.isin(['ERROR_ABSOLUTE_TEMPERATURE_AIR_200']), 'VALUE'].values
+        plot_traces.append(trace_temp)
 
-        trace_temp_err = go.Scatter(
+        trace_dewp = go.Scatter(name='Dewp',
                          x=xaxis,
-                         y=tperr,
+                         y=df.loc[df.PARAMETER.isin(['TEMPERATURE_DEW_POINT_200']), 'VALUE'],
                          mode="lines",
-                         showlegend=False,
-                         line=dict(color='rgb(179, 179, 179)', width=0))
+                         showlegend=True,
+                         line=dict(color='rgba(179, 179, 179, 0.5)', width=3))
 
-        trace_temp_err2 = go.Scatter(
-                         x=xaxis,
-                         y=tmerr,
-                         mode="lines",
-                         showlegend=False,
-                         line=dict(color='rgb(179, 179, 179)', width=0),
-                         fill='tonexty')
+        plot_traces.append(trace_dewp)
+
+        if ('ERROR_ABSOLUTE_TEMPERATURE_AIR_200' in df.PARAMETER.unique()):
+            tperr = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'].values+ \
+                    df.loc[df.PARAMETER.isin(['ERROR_ABSOLUTE_TEMPERATURE_AIR_200']), 'VALUE'].values
+            tmerr = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'].values- \
+                    df.loc[df.PARAMETER.isin(['ERROR_ABSOLUTE_TEMPERATURE_AIR_200']), 'VALUE'].values
+
+            trace_temp_err = go.Scatter(name='uncertainty',
+                             x=xaxis,
+                             y=tperr,
+                             mode="lines",
+                             showlegend=False,
+                             line=dict(color='rgb(179, 179, 179)', width=0))
+
+            trace_temp_err2 = go.Scatter(name='uncertainty',
+                             x=xaxis,
+                             y=tmerr,
+                             mode="lines",
+                             showlegend=False,
+                             line=dict(color='rgb(179, 179, 179)', width=0),
+                             fill='tonexty')
+
+            plot_traces.append(trace_temp_err)
+            plot_traces.append(trace_temp_err2)
 
         min_temp = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_MIN_200'])].dropna()
         max_temp = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_MAX_200'])].dropna()
@@ -148,6 +235,8 @@ def make_fig_time(df):
                          showlegend=False,
                          line=dict(color='rgb(102, 197, 204)'))
 
+        plot_traces.append(trace_temp_min)
+
         trace_temp_max= go.Scatter(name='max',
                          x=max_temp['DATE'],
                          y=max_temp['VALUE'],
@@ -155,30 +244,14 @@ def make_fig_time(df):
                          showlegend=False,
                          line=dict(color='rgb(248, 156, 116)'))
 
-
-        # trace_log_p1sigma = go.Scatter(
-        #   x=df['date'],
-        #   showlegend=False,
-        #   y=df[variable + '_prediction_upper'],
-        #   mode="lines",
-        # line=dict(color=color, width=0))
-
-        # trace_log_m1sigma = go.Scatter(
-        #   x=df['date'],
-        #   showlegend=False,
-        #   y=df[variable + '_prediction_lower'],
-        #   mode="lines",
-        #   line=dict(color=color, width=0),
-        #   fill='tonexty')
-
-        plot_traces = [trace_temp, trace_temp_err, trace_temp_err2, trace_temp_min, trace_temp_max]
+        plot_traces.append(trace_temp_max)
 
         fig = go.Figure(data=plot_traces)
 
         fig.update_layout(
             legend_orientation="h",
-            xaxis=dict(title='', rangemode = 'tozero'),
-            yaxis=dict(title=''),
+            xaxis=dict(title='', range=[xaxis.min(), xaxis.max()]),
+            yaxis=dict(title='Temp (°C)'),
             # legend=dict(
             #       title=dict(text='leave at '),
             #       font=dict(size=10)),
@@ -190,6 +263,153 @@ def make_fig_time(df):
         fig = make_empty_figure()
 
     return fig
+
+
+def make_fig_wind(df):
+    if df is not None:
+        xaxis = df.loc[df.PARAMETER.isin(['WIND_SPEED']), 'DATE']
+
+        plot_traces = []
+
+        trace_wind = go.Scatter(name='Wind speed',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['WIND_SPEED']), 'VALUE'],
+                         mode="lines",
+                         showlegend=True,
+                         line=dict(color='rgb(179, 179, 179)', width=3))
+
+        plot_traces.append(trace_wind)
+
+        # u, v = wind_components(df.loc[df.PARAMETER =='WIND_SPEED', 'VALUE'].values,
+        #         df.loc[df.PARAMETER =='WIND_DIRECTION', 'VALUE'].values)
+
+        # norm = np.sqrt(u**2 + v**2)
+        # u, v = u / norm, v / norm
+
+        # # we need to use the polar plot for the direction
+
+        trace_mslp = go.Scatter(name='Pressure',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['PRESSURE_AIR_SURFACE_REDUCED']), 'VALUE'],
+                         mode="lines",
+                         showlegend=True,
+                         line=dict(color='rgb(220, 176, 242)', width=3),
+                         yaxis="y2")
+
+        plot_traces.append(trace_mslp)
+
+        if 'ERROR_ABSOLUTE_WIND_SPEED' in df.PARAMETER.unique():
+            tperr = df.loc[df.PARAMETER.isin(['WIND_SPEED']), 'VALUE'].values+ \
+                    df.loc[df.PARAMETER.isin(['ERROR_ABSOLUTE_WIND_SPEED']), 'VALUE'].values
+            tmerr = df.loc[df.PARAMETER.isin(['WIND_SPEED']), 'VALUE'].values- \
+                    df.loc[df.PARAMETER.isin(['ERROR_ABSOLUTE_WIND_SPEED']), 'VALUE'].values
+
+            trace_wind_err = go.Scatter(name='uncertainty',
+                             x=xaxis,
+                             y=tperr,
+                             mode="lines",
+                             showlegend=False,
+                             line=dict(color='rgb(179, 179, 179)', width=0))
+
+            trace_wind_err2 = go.Scatter(name='uncertainty',
+                             x=xaxis,
+                             y=tmerr,
+                             mode="lines",
+                             showlegend=False,
+                             line=dict(color='rgb(179, 179, 179)', width=0),
+                         fill='tonexty')
+
+            plot_traces.append(trace_wind_err)
+            plot_traces.append(trace_wind_err2)
+
+        max_wind = df.loc[df.PARAMETER.isin(['WIND_GUST_MAX_LAST_3H'])].dropna()
+
+        trace_wind_max= go.Scatter(name='Gusts',
+                         x=max_wind['DATE'],
+                         y=max_wind['VALUE'],
+                         mode="markers",
+                         showlegend=True,
+                         line=dict(color='rgb(248, 156, 116)'))
+
+        plot_traces.append(trace_wind_max)
+
+        fig = go.Figure(data=plot_traces)
+
+        fig.add_trace(trace_mslp)
+
+        fig.update_layout(
+            legend_orientation="h",
+            xaxis=dict(title='', range=[xaxis.min(), xaxis.max()]),
+            yaxis=dict(title='Speed (km/h)', rangemode = 'tozero'),
+            yaxis2=dict(title='Pressure (hPa)', overlaying="y", side="right"),
+            # legend=dict(
+            #       title=dict(text='leave at '),
+            #       font=dict(size=10)),
+            height=390,
+            margin={"r": 0.1, "t": 0.1, "l": 0.1, "b": 0.1},
+            template='plotly_white',
+        )
+    else:
+        fig = make_empty_figure()
+
+    return fig
+
+
+def make_fig_prec(df):
+    if df is not None:
+        xaxis = df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'DATE']
+
+
+
+        plot_traces = []
+
+        trace_prec = go.Bar(name='Precipitation',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'VALUE'],
+                         showlegend=True,
+                         marker_color='rgb(102, 197, 204)')
+
+        plot_traces.append(trace_prec)
+
+        trace_snow = go.Bar(name='Snow',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_SNOW_EQUIV_LAST_1H']), 'VALUE'],
+                         showlegend=True,
+                         marker_color='rgb(254, 136, 177)')
+
+        plot_traces.append(trace_snow)
+
+        fig = go.Figure(data=plot_traces)
+
+        weather = df.loc[df.PARAMETER.isin(['WEATHER_SIGNIFICANT'])].dropna().set_index('DATE').resample('8H').nearest().reset_index()
+        icons = get_weather_icons(weather.VALUE, weather.DATE)
+
+        for icon in icons:
+            fig.add_layout_image(dict(
+            source=Image.open(icon['icon']),
+            xref='x',
+            x=icon['time'],
+            yref='paper',
+            y=0.8,
+            sizex=2*24*10*60*1000, sizey=1.0,
+            xanchor="right", yanchor="bottom"
+            ))
+
+
+        fig.update_layout(
+            legend_orientation="h",
+            xaxis=dict(title='', range=[xaxis.min(), xaxis.max()]),
+            yaxis=dict(title='Precipitation [mm/h]', rangemode = 'tozero'),
+            height=310,
+            margin={"r": 0.1, "t": 0.1, "l": 0.1, "b": 0.1},
+            template='plotly_white',
+            barmode='overlay'
+        )
+    else:
+        fig = make_empty_figure()
+
+    return fig
+
 
 
 def make_empty_figure(text="No data (yet 😃)"):
