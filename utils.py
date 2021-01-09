@@ -58,8 +58,8 @@ def get_weather_icons(ww, time):
     """
     weather = []
     for w in ww.values:
-        if str(w.astype(int)) in WMO_GLYPH_LOOKUP_PNG:
-            weather.append(WMO_GLYPH_LOOKUP_PNG[str(w.astype(int))])
+        if str(int(w)) in WMO_GLYPH_LOOKUP_PNG:
+            weather.append(WMO_GLYPH_LOOKUP_PNG[str(int(w))])
         else:
             weather.append('empty')
     weather_icons = []
