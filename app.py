@@ -5,11 +5,8 @@ import dash_html_components as html
 import utils
 from dash.dependencies import Input, Output, State
 import json
-import pandas as pd
 from flask_caching import Cache
 from flask import request
-import dash_leaflet as dl
-
 
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP,
@@ -63,7 +60,8 @@ controls = dbc.Card(
             className="mb-2",
         ),
 
-        dbc.Button("Generate", id="generate-button", className="mr-2"),
+        dbc.Button("Generate", id="generate-button",
+                    className="mr-2", disabled=True),
     ],
     body=True, className="mb-2"
 )
@@ -74,6 +72,12 @@ map_card = dbc.Card(
     ],
    className="mb-2"
 )
+
+# CSS styles to show/hide an element with transition
+initial_hidden_style = {'position': 'absolute', 'opacity': 0}
+final_shown_style = {'position': 'static',
+                     'opacity': 1,
+                     'transition': 'opacity 1s linear'}
 
 fig_card = dbc.Card(
     [
@@ -87,7 +91,9 @@ fig_card = dbc.Card(
         # ),
         dcc.Graph(id='time-plot')
     ],
-    className="mb-2"
+    className="mb-2",
+    style=initial_hidden_style,
+    id='temp-fig-card'
 )
 
 fig_wind_card = dbc.Card(
@@ -102,7 +108,9 @@ fig_wind_card = dbc.Card(
         # ),
         dcc.Graph(id='wind-plot')
     ],
-    className="mb-2"
+    className="mb-2",
+    style=initial_hidden_style,
+    id='wind-fig-card'
 )
 
 fig_prec_card = dbc.Card(
@@ -117,7 +125,9 @@ fig_prec_card = dbc.Card(
         # ),
         dcc.Graph(id='prec-plot')
     ],
-    className="mb-2"
+    className="mb-2",
+    style=initial_hidden_style,
+    id='prec-fig-card'
 )
 
 
@@ -139,7 +149,7 @@ help_card =  dbc.Card (  [
 app.layout = dbc.Container(
     [
         html.H1("Mosmix webapp"),
-        # html.H6('A simple webapp to save your bike rides from the crappy german weather'),
+        html.Div(id='garbage-output-0', style={'display':'none'}),
         html.Hr(),
         # dbc.Alert("Since the radar only covers Germany and neighbouring countries the app will fail if you enter an address outside of this area", 
         #     color="warning",
@@ -176,9 +186,54 @@ app.layout = dbc.Container(
 
     ],
     fluid=True,
+    id='container'
 )
 
 
+# show plots when generate button has been pressed
+@app.callback(
+    [Output("temp-fig-card", "style"),
+     Output("wind-fig-card", "style"),
+     Output("prec-fig-card", "style")],
+    [Input("generate-button", "n_clicks")]
+)
+def show_plots(n_clicks):
+    if n_clicks is None:
+        return [initial_hidden_style,
+                initial_hidden_style,
+                initial_hidden_style]
+    else:
+        return [final_shown_style,
+                final_shown_style,
+                final_shown_style]
+
+
+# activate generate button when we have at least 1 location selected
+@app.callback(
+    [Output("generate-button", "disabled")],
+    [Input("locations", "value")],
+    prevent_initial_call=True)
+def activate_button(locations):
+    if len(locations) > 0:
+        return [False]
+    else:
+        return [True]
+
+# Scroll to first plot when the style of the plots has been modified,
+# which happens after the generate button has been pressed
+app.clientside_callback(
+    """
+    function scrollToBottom(clicks, elementid) {
+        document.getElementById(elementid).scrollIntoView({behavior: "smooth",
+                                                            block: "start",
+                                                            inline: "nearest"});
+    }
+    """,
+    Output('garbage-output-0', 'children'),
+    [Input('temp-fig-card', 'style')],
+    [State('temp-fig-card', 'id')],
+    prevent_initial_call=True
+)
 
 # generate map plot at loading AND when the location is updated
 @app.callback(
@@ -334,8 +389,6 @@ def get_data(station, data_type):
         break
 
     df = data.data
-    # Fill NAN otherwise plotly has problems...don't understand why
-    #df = df.fillna(method='ffill').fillna(method='bfill')
     # remove categories
     df.PARAMETER = df.PARAMETER.astype(str)
     # Do some units conversion
