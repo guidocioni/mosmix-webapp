@@ -260,15 +260,15 @@ app.clientside_callback(
     function scrollToBottom(clicks, elementid) {
     var counter = 30;
     var checkExist = setInterval(function() {
-      counter--
-      if (document.getElementById(elementid) != null || counter === 0) {
-        clearInterval(checkExist);
-      }
-    }, 100);
-    setTimeout(function() { document.getElementById(elementid).scrollIntoView({behavior: "smooth",
+          counter--
+          if (document.getElementById(elementid) != null || counter === 0) {
+            clearInterval(checkExist);
+            document.getElementById(elementid).scrollIntoView({behavior: "smooth",
                                                             block: "start",
-                                                            inline: "nearest"});; }, 1000);
-                                                }
+                                                            inline: "nearest"})
+          }
+        }, 100);
+    }
     """,
     Output('garbage-output-0', 'children'),
     [Input("generate-button", "n_clicks")],
