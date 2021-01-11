@@ -258,13 +258,20 @@ def show_plots(switch):
 app.clientside_callback(
     """
     function scrollToBottom(clicks, elementid) {
+    var counter = 30;
+    var checkExist = setInterval(function() {
+      counter--
+      if (document.getElementById(elementid) != null || counter === 0) {
+        clearInterval(checkExist);
+      }
+    }, 100);
     setTimeout(function() { document.getElementById(elementid).scrollIntoView({behavior: "smooth",
                                                             block: "start",
                                                             inline: "nearest"});; }, 1000);
                                                 }
     """,
     Output('garbage-output-0', 'children'),
-    [Input("map-div", "children")],
+    [Input("generate-button", "n_clicks")],
     [State('temp-fig-card', 'id')],
     prevent_initial_call=True
 )
