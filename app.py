@@ -7,7 +7,7 @@ from dash.dependencies import Input, Output, State
 import json
 from flask_caching import Cache
 from flask import request
-
+from dash.exceptions import PreventUpdate
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP,
                 'https://fonts.googleapis.com/css?family=Open+Sans:300,400,700'],
@@ -20,21 +20,32 @@ server = app.server
 cache = Cache(server, config={'CACHE_TYPE': 'filesystem', 
                               'CACHE_DIR': '/tmp'})
 
+# CSS styles to show/hide an element with transition
+initial_hidden_style = {'position': 'absolute', 'opacity': 0}
+final_shown_style = {'position': 'static',
+                     'opacity': 1,
+                     'transition': 'opacity 0.5s linear'}
 
 controls = dbc.Card(
     [
         dbc.InputGroup(
             [
-                dbc.InputGroupAddon("query", addon_type="prepend"),
-                dbc.Input(placeholder="type address or get current location on map", id='from_address', 
+                dbc.Input(placeholder="Where are you?",
+                    id='from_address', 
                           type='text', autoComplete=True),
             ],
             className="mb-2",
         ),
-        dbc.Button("Search", id="search-button", className=["mr-2", "mb-2"]),
+        dbc.Row(
+            [
+                dbc.Button("Search", id="search-button",
+                    className=["mb-2"],)
+            ],justify='center'
+            ),
+        html.Div('Here are the 5 closest locations',
+                id='closest_locations_description'),
         dbc.InputGroup(
             [
-                dbc.InputGroupAddon("location", addon_type="prepend"),
                 dbc.Select(
                     id="locations",
                     options=[],
@@ -45,7 +56,7 @@ controls = dbc.Card(
         ),
         dbc.InputGroup(
             [
-                dbc.InputGroupAddon("Data type", addon_type="prepend"),
+                # dbc.InputGroupAddon("Data type", addon_type="prepend"),
                 dbc.RadioItems(
                     options=[
                         {"label": "Large", "value": 'L'},
@@ -54,14 +65,18 @@ controls = dbc.Card(
                     value='L',
                     id="data-type",
                     inline=True,
-                    className="ml-2"
+                    className="ml-2",
+                    style=initial_hidden_style
                 ),
             ],
             className="mb-2",
         ),
-
-        dbc.Button("Generate", id="generate-button",
-                    className="mr-2", disabled=True),
+        dbc.Row(
+            [
+            dbc.Button("Generate", id="generate-button",
+                    className="mr-2", style=initial_hidden_style)
+            ], justify='center'
+            ),
     ],
     body=True, className="mb-2"
 )
@@ -73,23 +88,9 @@ map_card = dbc.Card(
    className="mb-2"
 )
 
-# CSS styles to show/hide an element with transition
-initial_hidden_style = {'position': 'absolute', 'opacity': 0}
-final_shown_style = {'position': 'static',
-                     'opacity': 1,
-                     'transition': 'opacity 1s linear'}
-
 fig_card = dbc.Card(
     [
-        # dbc.Checklist(
-        #     options=[
-        #         {"label": "More details", "value": "time_series"},
-        #     ],
-        #     value=[],
-        #     id="switches-input",
-        #     switch=True,
-        # ),
-        dcc.Graph(id='time-plot')
+        dcc.Graph(id='temp-plot')
     ],
     className="mb-2",
     style=initial_hidden_style,
@@ -98,14 +99,6 @@ fig_card = dbc.Card(
 
 fig_wind_card = dbc.Card(
     [
-        # dbc.Checklist(
-        #     options=[
-        #         {"label": "More details", "value": "time_series"},
-        #     ],
-        #     value=[],
-        #     id="switches-input",
-        #     switch=True,
-        # ),
         dcc.Graph(id='wind-plot')
     ],
     className="mb-2",
@@ -115,14 +108,6 @@ fig_wind_card = dbc.Card(
 
 fig_prec_card = dbc.Card(
     [
-        # dbc.Checklist(
-        #     options=[
-        #         {"label": "More details", "value": "time_series"},
-        #     ],
-        #     value=[],
-        #     id="switches-input",
-        #     switch=True,
-        # ),
         dcc.Graph(id='prec-plot')
     ],
     className="mb-2",
@@ -135,12 +120,6 @@ help_card =  dbc.Card (  [
         dbc.CardBody(
             [
                 html.H4("Help", className="card-title"),
-                # html.P(
-                #     ["Enter the start and end point of your journey and press on generate. "
-                #     "After a few seconds the graph will show precipitation forecast on your journey for different start times. You can then decide when to leave. "
-                #     "For details see ", html.A('here', href='https://github.com/guidocioni/no-more-wet-rides-new')],
-                #     className="card-text",
-                # ),
             ]
         ),
     ],className="mb-1" )
@@ -151,43 +130,59 @@ app.layout = dbc.Container(
         html.H1("Mosmix webapp"),
         html.Div(id='garbage-output-0', style={'display':'none'}),
         html.Hr(),
-        # dbc.Alert("Since the radar only covers Germany and neighbouring countries the app will fail if you enter an address outside of this area", 
-        #     color="warning",
-        #     dismissable=True,
-        #     duration=5000),
-        # dbc.Alert("Your ride duration exceeds the radar forecast horizon. Results will only be partial! Click on \"more details\" in the plot to show the used data.",
-        #     dismissable=True,
-        #     color="warning",
-        #     is_open=False,
-        #     id='long-ride-alert'),
         dbc.Row(
             [
                 dbc.Col([
-                        dbc.Row(
-                            [
-                                dbc.Col(controls),
+                        controls,
+                        map_card,
+                        dbc.Checklist(
+                                    options=[
+                                        {"label": "Temperature details", "value": "time_series"},
+                                    ],
+                                    value=["time_series"],
+                                    id="switches-input-temp",
+                                    switch=True,
+                                ),
+                        dbc.Spinner(fig_card),
+                        dbc.Checklist(
+                                    options=[
+                                        {"label": "Wind details", "value": "time_series"},
+                                    ],
+                                    value=[],
+                                    id="switches-input-wind",
+                                    switch=True,
+                                ),
+                        dbc.Spinner(fig_wind_card),
+                        dbc.Checklist(
+                            options=[
+                                {"label": "Precipitation details", "value": "time_series"},
                             ],
+                            value=[],
+                            id="switches-input-prec",
+                            switch=True,
                         ),
-                        dbc.Row(
-                            [
-                                dbc.Col(map_card),
-                            ],
-                        ),
-                        ], sm=12, md=12, lg=4, align='center'),
-                dbc.Col(
-                    [
-                    dbc.Spinner(fig_card),
-                    dbc.Spinner(fig_wind_card),
-                    dbc.Spinner(fig_prec_card),
-                    ],
-                 sm=12, md=12, lg=7, align='center'),
-            ], justify="center",
-        ),
-
+                        dbc.Spinner(fig_prec_card),
+                    ], sm=11, md=10, lg=8, xl=7, align='center')
+            ], justify='center'
+            )
     ],
     fluid=True,
-    id='container'
+    id='container',
 )
+
+
+@app.callback(
+    [Output("closest_locations_description", "style"),
+     Output("generate-button", "style"),
+     Output("data-type", "style")],
+    [Input("search-button", "n_clicks")],
+    prevent_initial_call=True
+)
+def show_plots(n_clicks):
+    if n_clicks is None:
+        return [initial_hidden_style, initial_hidden_style, initial_hidden_style]
+    else:
+        return [final_shown_style, final_shown_style, final_shown_style]
 
 
 # show plots when generate button has been pressed
@@ -195,7 +190,8 @@ app.layout = dbc.Container(
     [Output("temp-fig-card", "style"),
      Output("wind-fig-card", "style"),
      Output("prec-fig-card", "style")],
-    [Input("generate-button", "n_clicks")]
+    [Input("generate-button", "n_clicks")],
+    prevent_initial_call=True
 )
 def show_plots(n_clicks):
     if n_clicks is None:
@@ -207,30 +203,68 @@ def show_plots(n_clicks):
                 final_shown_style,
                 final_shown_style]
 
-
-# activate generate button when we have at least 1 location selected
+# show plots when generate button has been pressed
 @app.callback(
-    [Output("generate-button", "disabled")],
-    [Input("locations", "value")],
-    prevent_initial_call=True)
-def activate_button(locations):
-    if len(locations) > 0:
-        return [False]
+    [Output("switches-input-temp", "style"),
+     Output("switches-input-prec", "style"),
+     Output("switches-input-wind", "style")],
+    [Input("generate-button", "n_clicks")],
+)
+def show_switches(n_clicks):
+    if n_clicks is None:
+        return [initial_hidden_style,
+                initial_hidden_style,
+                initial_hidden_style]
     else:
-        return [True]
+        return [final_shown_style,
+                final_shown_style,
+                final_shown_style]
+
+
+# Callback for the toggles
+@app.callback(
+    [Output("wind-plot", "style")],
+    [Input("switches-input-wind", "value")],
+)
+def show_plots(switch):
+    if switch == ['time_series']:
+        return [final_shown_style]
+    else:
+        return [initial_hidden_style]
+#
+@app.callback(
+    [Output("prec-plot", "style")],
+    [Input("switches-input-prec", "value")],
+)
+def show_plots(switch):
+    if switch == ['time_series']:
+        return [final_shown_style]
+    else:
+        return [initial_hidden_style]
+#
+@app.callback(
+    [Output("temp-plot", "style")],
+    [Input("switches-input-temp", "value")],
+)
+def show_plots(switch):
+    if switch == ['time_series']:
+        return [final_shown_style]
+    else:
+        return [initial_hidden_style]
+
 
 # Scroll to first plot when the style of the plots has been modified,
 # which happens after the generate button has been pressed
 app.clientside_callback(
     """
     function scrollToBottom(clicks, elementid) {
-        document.getElementById(elementid).scrollIntoView({behavior: "smooth",
+    setTimeout(function() { document.getElementById(elementid).scrollIntoView({behavior: "smooth",
                                                             block: "start",
-                                                            inline: "nearest"});
-    }
+                                                            inline: "nearest"});; }, 1000);
+                                                }
     """,
     Output('garbage-output-0', 'children'),
-    [Input('temp-fig-card', 'style')],
+    [Input("map-div", "children")],
     [State('temp-fig-card', 'id')],
     prevent_initial_call=True
 )
@@ -239,7 +273,8 @@ app.clientside_callback(
 @app.callback(
     [Output("map-div", "children")],
     [Input("generate-button", "n_clicks")],
-    [State("locations", "value")]
+    [State("locations", "value")],
+    prevent_initial_call=True
 )
 def create_coords_and_map(n_clicks, from_address):
     if n_clicks is None:
@@ -259,34 +294,41 @@ def create_coords_and_map(n_clicks, from_address):
             return utils.generate_map_plot(None)
 
 
+# generate the data and the plots when generate is pressed 
+# (we call get_stations and get_data in every function
+# but the parent functions are cached!)
 @app.callback(
-    Output("time-plot", "figure"),
+    Output("temp-plot", "figure"),
     [Input("generate-button", "n_clicks")],
-    [State("locations", "value"), State("data-type", "value")]
+    [State("locations", "value"), State("data-type", "value")],
+    prevent_initial_call=True
 )
 def func(n_clicks, from_address, data_type):
-    if n_clicks is None:
-        return utils.make_fig_time(None)
-    else:
-        if from_address is not None:
-            mosmix_stations = get_stations()
-            if 'value' in from_address:
-                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
-            else:
-                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
-
-            df = get_data(sel_station.WMO_ID.item(), data_type[0])
-            fig = utils.make_fig_time(df)
-
-            return fig
-        else:
+    ctx = dash.callback_context
+    if ctx.triggered[0]['prop_id'].split('.')[0] == 'generate-button':
+        if n_clicks is None:
             return utils.make_fig_time(None)
+        else:
+            if from_address is not None:
+                mosmix_stations = get_stations()
+                if 'value' in from_address:
+                    sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
+                else:
+                    sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
+
+                df = get_data(sel_station.WMO_ID.item(), data_type[0])
+                fig = utils.make_fig_time(df)
+
+                return fig
+            else:
+                return utils.make_fig_time(None)
 
 
 @app.callback(
     Output("wind-plot", "figure"),
     [Input("generate-button", "n_clicks")],
-    [State("locations", "value"), State("data-type", "value")]
+    [State("locations", "value"), State("data-type", "value")],
+    prevent_initial_call=True
 )
 def func2(n_clicks, from_address, data_type):
     if n_clicks is None:
@@ -310,7 +352,8 @@ def func2(n_clicks, from_address, data_type):
 @app.callback(
     Output("prec-plot", "figure"),
     [Input("generate-button", "n_clicks")],
-    [State("locations", "value"), State("data-type", "value")]
+    [State("locations", "value"), State("data-type", "value")],
+    prevent_initial_call=True
 )
 def func3(n_clicks, from_address, data_type):
     if n_clicks is None:
@@ -333,7 +376,8 @@ def func3(n_clicks, from_address, data_type):
 
 @app.callback(
     [Output("locations", "options"),
-     Output("locations", "value")],
+     Output("locations", "value"),
+     Output("locations", "style")],
     [Input("search-button", "n_clicks")],
     [State("from_address", "value")],
     prevent_initial_call=True
@@ -356,7 +400,7 @@ def get_closest_address(n_clicks, from_address):
                 }
             )
 
-        return [options, options[0]]
+        return [options, options[0], final_shown_style]
 
 
 # get location with geolocation button
