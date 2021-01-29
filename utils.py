@@ -183,6 +183,17 @@ def make_fig_time(df):
 
         plot_traces = []
 
+        trace_sun = go.Scatter(name='Sun. dur.',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['SUNSHINE_DURATION']), 'VALUE'],
+                         mode='lines',
+                         showlegend=True,
+                         line=dict(color='rgba(246, 207, 113, 0.1)', width=0),
+                         yaxis='y3',
+                         fill='tozeroy')
+
+        plot_traces.append(trace_sun)
+
         trace_temp = go.Scatter(name='Temp',
                          x=xaxis,
                          y=df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'],
@@ -246,18 +257,51 @@ def make_fig_time(df):
 
         plot_traces.append(trace_temp_max)
 
+        trace_prec = go.Bar(name='Rain',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'VALUE'],
+                         showlegend=True,
+                         marker_color='rgb(102, 197, 204)',
+                         yaxis="y2")
+
+        plot_traces.append(trace_prec)
+
+        trace_snow = go.Bar(name='Snow',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_SNOW_EQUIV_LAST_1H']), 'VALUE'],
+                         showlegend=True,
+                         marker_color='rgb(254, 136, 177)',
+                         yaxis="y2")
+
+        plot_traces.append(trace_snow)
+
         fig = go.Figure(data=plot_traces)
+
+        weather = df.loc[df.PARAMETER.isin(['WEATHER_SIGNIFICANT'])].dropna().set_index('DATE').resample('8H').nearest().reset_index()
+        icons = get_weather_icons(weather.VALUE, weather.DATE)
+
+        for icon in icons:
+            fig.add_layout_image(dict(
+            source=Image.open(icon['icon']),
+            xref='x',
+            x=icon['time'],
+            yref='paper',
+            y=0.92,
+            sizex=2*24*10*60*1000, sizey=1.0,
+            xanchor="right", yanchor="bottom"
+            ))
 
         fig.update_layout(
             legend_orientation="h",
-            xaxis=dict(title='', range=[xaxis.min(), xaxis.max()]),
-            yaxis=dict(title='Temp (°C)'),
-            # legend=dict(
-            #       title=dict(text='leave at '),
-            #       font=dict(size=10)),
+            xaxis=dict(title='', range=[xaxis.min(), xaxis.max()], showgrid=True),
+            yaxis=dict(title='Temp (°C)', showgrid=False, zeroline=True),
+            yaxis3=dict(title='', showgrid=False, overlaying="y", range=[3600, 0], showticklabels=False),
+            yaxis2=dict(title='P [mm/h]', overlaying="y", side="right", range=[0,
+                df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'VALUE'].max() * 3.], showgrid=False),
             height=390,
             margin={"r": 0.1, "t": 0.1, "l": 0.1, "b": 0.1},
             template='plotly_white',
+            barmode='overlay'
         )
     else:
         fig = make_empty_figure()
@@ -359,13 +403,11 @@ def make_fig_prec(df):
     if df is not None:
         xaxis = df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'DATE']
 
-
-
         plot_traces = []
 
-        trace_prec = go.Bar(name='Precipitation',
+        trace_prec = go.Bar(name='Rain',
                          x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'VALUE'],
+                         y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_LIQUID_LAST_1H']), 'VALUE'],
                          showlegend=True,
                          marker_color='rgb(102, 197, 204)')
 
@@ -373,37 +415,31 @@ def make_fig_prec(df):
 
         trace_snow = go.Bar(name='Snow',
                          x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_SNOW_EQUIV_LAST_1H']), 'VALUE'],
+                         y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_SOLID_LAST_1H']), 'VALUE'],
                          showlegend=True,
                          marker_color='rgb(254, 136, 177)')
 
         plot_traces.append(trace_snow)
 
+        trace_ice = go.Bar(name='Frzr',
+                         x=xaxis,
+                         y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_FREEZING_LAST_1H']), 'VALUE'],
+                         showlegend=True,
+                         marker_color='rgb(180, 151, 231)')
+
+        plot_traces.append(trace_ice)
+
         fig = go.Figure(data=plot_traces)
-
-        weather = df.loc[df.PARAMETER.isin(['WEATHER_SIGNIFICANT'])].dropna().set_index('DATE').resample('8H').nearest().reset_index()
-        icons = get_weather_icons(weather.VALUE, weather.DATE)
-
-        for icon in icons:
-            fig.add_layout_image(dict(
-            source=Image.open(icon['icon']),
-            xref='x',
-            x=icon['time'],
-            yref='paper',
-            y=0.8,
-            sizex=2*24*10*60*1000, sizey=1.0,
-            xanchor="right", yanchor="bottom"
-            ))
 
 
         fig.update_layout(
             legend_orientation="h",
-            xaxis=dict(title='', range=[xaxis.min(), xaxis.max()]),
-            yaxis=dict(title='Precipitation [mm/h]', rangemode = 'tozero'),
+            xaxis=dict(title='', range=[xaxis.min(), xaxis.max()], showgrid=True),
+            yaxis=dict(title='Prob [%]', rangemode = 'tozero'),
             height=310,
             margin={"r": 0.1, "t": 0.1, "l": 0.1, "b": 0.1},
             template='plotly_white',
-            barmode='overlay'
+            barmode='stack'
         )
     else:
         fig = make_empty_figure()
@@ -485,7 +521,7 @@ def generate_map_plot(data):
                     ],
                center=point,
                zoom=4,
-               style={'width': '100%', 'height': '45vh', 'margin': "auto", "display": "block"},
+               style={'width': '100%', 'height': '35vh', 'margin': "auto", "display": "block"},
                id='map')]
     else:# make an empty map
         fig = make_empty_map()

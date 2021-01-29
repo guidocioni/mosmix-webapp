@@ -423,7 +423,7 @@ def update_location(location):
         raise dash.exceptions.PreventUpdate
 
 
-@cache.memoize(1800)
+@cache.memoize(3600)
 def get_data(station, data_type):
     if data_type == 'L':
         mosmix_type = utils.DWDMosmixType.LARGE
