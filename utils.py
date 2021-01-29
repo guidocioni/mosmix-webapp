@@ -183,34 +183,37 @@ def make_fig_time(df):
 
         plot_traces = []
 
-        trace_sun = go.Scatter(name='Sun. dur.',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['SUNSHINE_DURATION']), 'VALUE'],
-                         mode='lines',
-                         showlegend=True,
-                         line=dict(color='rgba(246, 207, 113, 0.1)', width=0),
-                         yaxis='y3',
-                         fill='tozeroy')
+        if ('SUNSHINE_DURATION' in df.PARAMETER.unique()):
+            trace_sun = go.Scatter(name='Sun. dur.',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['SUNSHINE_DURATION']), 'VALUE'],
+                             mode='lines',
+                             showlegend=True,
+                             line=dict(color='rgba(246, 207, 113, 0.1)', width=0),
+                             yaxis='y3',
+                             fill='tozeroy')
 
-        plot_traces.append(trace_sun)
+            plot_traces.append(trace_sun)
 
-        trace_temp = go.Scatter(name='Temp',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'],
-                         mode="lines",
-                         showlegend=True,
-                         line=dict(color='rgb(179, 179, 179)', width=3))
+        if ('TEMPERATURE_AIR_200' in df.PARAMETER.unique()):
+            trace_temp = go.Scatter(name='Temp',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'],
+                             mode="lines",
+                             showlegend=True,
+                             line=dict(color='rgb(179, 179, 179)', width=3))
 
-        plot_traces.append(trace_temp)
+            plot_traces.append(trace_temp)
 
-        trace_dewp = go.Scatter(name='Dewp',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['TEMPERATURE_DEW_POINT_200']), 'VALUE'],
-                         mode="lines",
-                         showlegend=True,
-                         line=dict(color='rgba(179, 179, 179, 0.5)', width=3))
+        if ('TEMPERATURE_DEW_POINT_200' in df.PARAMETER.unique()):
+            trace_dewp = go.Scatter(name='Dewp',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['TEMPERATURE_DEW_POINT_200']), 'VALUE'],
+                             mode="lines",
+                             showlegend=True,
+                             line=dict(color='rgba(179, 179, 179, 0.5)', width=3))
 
-        plot_traces.append(trace_dewp)
+            plot_traces.append(trace_dewp)
 
         if ('ERROR_ABSOLUTE_TEMPERATURE_AIR_200' in df.PARAMETER.unique()):
             tperr = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_200']), 'VALUE'].values+ \
@@ -236,60 +239,64 @@ def make_fig_time(df):
             plot_traces.append(trace_temp_err)
             plot_traces.append(trace_temp_err2)
 
-        min_temp = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_MIN_200'])].dropna()
-        max_temp = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_MAX_200'])].dropna()
+        if ('TEMPERATURE_AIR_MIN_200' in df.PARAMETER.unique()):
+            min_temp = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_MIN_200'])].dropna()
+            max_temp = df.loc[df.PARAMETER.isin(['TEMPERATURE_AIR_MAX_200'])].dropna()
 
-        trace_temp_min= go.Scatter(name='min',
-                         x=min_temp['DATE'],
-                         y=min_temp['VALUE'],
-                         mode="markers",
-                         showlegend=False,
-                         line=dict(color='rgb(102, 197, 204)'))
+            trace_temp_min= go.Scatter(name='min',
+                             x=min_temp['DATE'],
+                             y=min_temp['VALUE'],
+                             mode="markers",
+                             showlegend=False,
+                             line=dict(color='rgb(102, 197, 204)'))
 
-        plot_traces.append(trace_temp_min)
+            plot_traces.append(trace_temp_min)
 
-        trace_temp_max= go.Scatter(name='max',
-                         x=max_temp['DATE'],
-                         y=max_temp['VALUE'],
-                         mode="markers",
-                         showlegend=False,
-                         line=dict(color='rgb(248, 156, 116)'))
+            trace_temp_max= go.Scatter(name='max',
+                             x=max_temp['DATE'],
+                             y=max_temp['VALUE'],
+                             mode="markers",
+                             showlegend=False,
+                             line=dict(color='rgb(248, 156, 116)'))
 
-        plot_traces.append(trace_temp_max)
+            plot_traces.append(trace_temp_max)
 
-        trace_prec = go.Bar(name='Rain',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'VALUE'],
-                         showlegend=True,
-                         marker_color='rgb(102, 197, 204)',
-                         yaxis="y2")
+        if ('PRECIPITATION_CONSIST_LAST_1H' in df.PARAMETER.unique()):
+            trace_prec = go.Bar(name='Rain',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'VALUE'],
+                             showlegend=True,
+                             marker_color='rgb(102, 197, 204)',
+                             yaxis="y2")
 
-        plot_traces.append(trace_prec)
+            plot_traces.append(trace_prec)
 
-        trace_snow = go.Bar(name='Snow',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['PRECIPITATION_SNOW_EQUIV_LAST_1H']), 'VALUE'],
-                         showlegend=True,
-                         marker_color='rgb(254, 136, 177)',
-                         yaxis="y2")
+        if ('PRECIPITATION_SNOW_EQUIV_LAST_1H' in df.PARAMETER.unique()):
+            trace_snow = go.Bar(name='Snow',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['PRECIPITATION_SNOW_EQUIV_LAST_1H']), 'VALUE'],
+                             showlegend=True,
+                             marker_color='rgb(254, 136, 177)',
+                             yaxis="y2")
 
-        plot_traces.append(trace_snow)
+            plot_traces.append(trace_snow)
 
         fig = go.Figure(data=plot_traces)
 
-        weather = df.loc[df.PARAMETER.isin(['WEATHER_SIGNIFICANT'])].dropna().set_index('DATE').resample('8H').nearest().reset_index()
-        icons = get_weather_icons(weather.VALUE, weather.DATE)
+        if ('WEATHER_SIGNIFICANT' in df.PARAMETER.unique()):
+            weather = df.loc[df.PARAMETER.isin(['WEATHER_SIGNIFICANT'])].dropna().set_index('DATE').resample('8H').nearest().reset_index()
+            icons = get_weather_icons(weather.VALUE, weather.DATE)
 
-        for icon in icons:
-            fig.add_layout_image(dict(
-            source=Image.open(icon['icon']),
-            xref='x',
-            x=icon['time'],
-            yref='paper',
-            y=0.92,
-            sizex=2*24*10*60*1000, sizey=1.0,
-            xanchor="right", yanchor="bottom"
-            ))
+            for icon in icons:
+                fig.add_layout_image(dict(
+                source=Image.open(icon['icon']),
+                xref='x',
+                x=icon['time'],
+                yref='paper',
+                y=0.92,
+                sizex=2*24*10*60*1000, sizey=1.0,
+                xanchor="right", yanchor="bottom"
+                ))
 
         fig.update_layout(
             legend_orientation="h",
@@ -405,29 +412,32 @@ def make_fig_prec(df):
 
         plot_traces = []
 
-        trace_prec = go.Bar(name='Rain',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_LIQUID_LAST_1H']), 'VALUE'],
-                         showlegend=True,
-                         marker_color='rgb(102, 197, 204)')
+        if ('PROBABILITY_PRECIPITATION_LIQUID_LAST_1H' in df.PARAMETER.unique()):
+            trace_prec = go.Bar(name='Rain',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_LIQUID_LAST_1H']), 'VALUE'],
+                             showlegend=True,
+                             marker_color='rgb(102, 197, 204)')
 
-        plot_traces.append(trace_prec)
+            plot_traces.append(trace_prec)
 
-        trace_snow = go.Bar(name='Snow',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_SOLID_LAST_1H']), 'VALUE'],
-                         showlegend=True,
-                         marker_color='rgb(254, 136, 177)')
+        if ('PROBABILITY_PRECIPITATION_SOLID_LAST_1H' in df.PARAMETER.unique()):
+            trace_snow = go.Bar(name='Snow',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_SOLID_LAST_1H']), 'VALUE'],
+                             showlegend=True,
+                             marker_color='rgb(254, 136, 177)')
 
-        plot_traces.append(trace_snow)
+            plot_traces.append(trace_snow)
 
-        trace_ice = go.Bar(name='Frzr',
-                         x=xaxis,
-                         y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_FREEZING_LAST_1H']), 'VALUE'],
-                         showlegend=True,
-                         marker_color='rgb(180, 151, 231)')
+        if ('PROBABILITY_PRECIPITATION_FREEZING_LAST_1H' in df.PARAMETER.unique()):
+            trace_ice = go.Bar(name='Frzr',
+                             x=xaxis,
+                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_FREEZING_LAST_1H']), 'VALUE'],
+                             showlegend=True,
+                             marker_color='rgb(180, 151, 231)')
 
-        plot_traces.append(trace_ice)
+            plot_traces.append(trace_ice)
 
         fig = go.Figure(data=plot_traces)
 
