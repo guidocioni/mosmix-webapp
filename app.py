@@ -8,6 +8,7 @@ import json
 from flask_caching import Cache
 from flask import request
 from dash.exceptions import PreventUpdate
+import pandas as pd
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP,
                 'https://fonts.googleapis.com/css?family=Open+Sans:300,400,700'],
@@ -460,10 +461,13 @@ def get_data(station, data_type):
 
 @cache.memoize(86400)
 def get_stations():
-    mosmix_stations = utils.metadata_for_forecasts()
-    mosmix_stations['LAT'] = mosmix_stations['LAT'].astype(float)
-    mosmix_stations['LON'] = mosmix_stations['LON'].astype(float)
-    mosmix_stations['STATION_HEIGHT'] = mosmix_stations['STATION_HEIGHT'].astype(float)
+    # mosmix_stations = utils.metadata_for_forecasts()
+    # mosmix_stations['LAT'] = mosmix_stations['LAT'].astype(float)
+    # mosmix_stations['LON'] = mosmix_stations['LON'].astype(float)
+    # mosmix_stations['STATION_HEIGHT'] = mosmix_stations['STATION_HEIGHT'].astype(float)
+
+    # mosmix_stations.to_pickle('stations_list.pkl')
+    mosmix_stations = pd.read_pickle('stations_list.pkl')
 
     return mosmix_stations
 
