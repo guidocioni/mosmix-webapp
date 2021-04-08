@@ -408,14 +408,14 @@ def make_fig_wind(df):
 
 def make_fig_prec(df):
     if df is not None:
-        xaxis = df.loc[df.PARAMETER.isin(['PRECIPITATION_CONSIST_LAST_1H']), 'DATE']
+        xaxis = df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_LIQUID_LAST_1H'])].dropna()['DATE']
 
         plot_traces = []
 
         if ('PROBABILITY_PRECIPITATION_LIQUID_LAST_1H' in df.PARAMETER.unique()):
             trace_prec = go.Bar(name='Rain',
                              x=xaxis,
-                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_LIQUID_LAST_1H']), 'VALUE'],
+                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_LIQUID_LAST_1H']), 'VALUE'].dropna(),
                              showlegend=True,
                              marker_color='rgb(102, 197, 204)')
 
@@ -424,7 +424,7 @@ def make_fig_prec(df):
         if ('PROBABILITY_PRECIPITATION_SOLID_LAST_1H' in df.PARAMETER.unique()):
             trace_snow = go.Bar(name='Snow',
                              x=xaxis,
-                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_SOLID_LAST_1H']), 'VALUE'],
+                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_SOLID_LAST_1H']), 'VALUE'].dropna(),
                              showlegend=True,
                              marker_color='rgb(254, 136, 177)')
 
@@ -433,7 +433,7 @@ def make_fig_prec(df):
         if ('PROBABILITY_PRECIPITATION_FREEZING_LAST_1H' in df.PARAMETER.unique()):
             trace_ice = go.Bar(name='Frzr',
                              x=xaxis,
-                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_FREEZING_LAST_1H']), 'VALUE'],
+                             y=df.loc[df.PARAMETER.isin(['PROBABILITY_PRECIPITATION_FREEZING_LAST_1H']), 'VALUE'].dropna(),
                              showlegend=True,
                              marker_color='rgb(180, 151, 231)')
 
