@@ -439,7 +439,7 @@ def update_location(location):
         raise dash.exceptions.PreventUpdate
 
 
-@cache.memoize(3600)
+#@cache.memoize(3600)
 def get_data(station, data_type):
     if data_type == 'L':
         mosmix_type = DwdMosmixType.LARGE
@@ -454,23 +454,23 @@ def get_data(station, data_type):
                    tidy=True).filter_by_station_id(station_id=[station])
 
     df = stations.values.all().df
-
+    df = df.drop(columns=['quality'])
     # remove categories
     df.parameter = df.parameter.astype(str)
     # Do some units conversion
-    params = ['TEMPERATURE_AIR_200', 'TEMPERATURE_DEW_POINT_200', 'TEMPERATURE_AIR_MAX_200',
-              'TEMPERATURE_AIR_MIN_200', 'TEMPERATURE_AIR_005', 'TEMPERATURE_AIR_MIN_005_LAST_12H',
-              "TEMPERATURE_AIR_200_LAST_24H"]
+    params = ['temperature_air_200', 'temperature_dew_point_200', 'temperature_air_max_200',
+              'temperature_air_min_200', 'temperature_air_005', 'temperature_air_min_005_last_12h',
+              "temperature_air_200_last_24h"]
     df.loc[df.parameter.isin(params), 'value'] = df.loc[df.parameter.isin(
         params), 'value'] - 273.15
     #
-    params = ['WIND_SPEED', 'WIND_GUST_MAX_LAST_1H', 'WIND_GUST_MAX_LAST_3H',
-              'WIND_GUST_MAX_LAST_12H']
+    params = ['wind_speed', 'wind_gust_max_last_1h', 'wind_gust_max_last_3h',
+              'wind_gust_max_last_12h']
     df.loc[df.parameter.isin(params), 'value'] = df.loc[df.parameter.isin(
         params), 'value'] * 3.6
     #
-    df.loc[df.parameter == 'PRESSURE_AIR_SURFACE_REDUCED', 'value'] = \
-        df.loc[df.parameter == 'PRESSURE_AIR_SURFACE_REDUCED', 'value'] / 100.
+    df.loc[df.parameter == 'pressure_air_surface_reduced', 'value'] = \
+        df.loc[df.parameter == 'pressure_air_surface_reduced', 'value'] / 100.
 
     return df
 
