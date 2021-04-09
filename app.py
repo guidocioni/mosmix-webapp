@@ -6,19 +6,20 @@ import utils
 from dash.dependencies import Input, Output, State
 import json
 from flask_caching import Cache
-from flask import request
-from dash.exceptions import PreventUpdate
 import pandas as pd
+from wetterdienst.provider.dwd.forecast import DwdMosmixType
+from wetterdienst import Wetterdienst
+import requests
 
 app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP,
                 'https://fonts.googleapis.com/css?family=Open+Sans:300,400,700'],
                 url_base_pathname='/mosmix/',
-                meta_tags=[{'name': 'viewport', 
+                meta_tags=[{'name': 'viewport',
                             'content': 'width=device-width, initial-scale=1'}])
 
 server = app.server
 
-cache = Cache(server, config={'CACHE_TYPE': 'filesystem', 
+cache = Cache(server, config={'CACHE_TYPE': 'filesystem',
                               'CACHE_DIR': '/tmp'})
 
 # CSS styles to show/hide an element with transition
@@ -32,7 +33,7 @@ controls = dbc.Card(
         dbc.InputGroup(
             [
                 dbc.Input(placeholder="Where are you?",
-                    id='from_address', 
+                          id='from_address',
                           type='text', autoComplete=True),
             ],
             className="mb-2",
@@ -40,11 +41,11 @@ controls = dbc.Card(
         dbc.Row(
             [
                 dbc.Button("Search", id="search-button",
-                    className=["mb-2"],)
-            ],justify='center'
-            ),
+                           className=["mb-2"],)
+            ], justify='center'
+        ),
         html.Div('Here are the 5 closest locations',
-                id='closest_locations_description'),
+                 id='closest_locations_description'),
         dbc.InputGroup(
             [
                 dbc.Select(
@@ -74,10 +75,10 @@ controls = dbc.Card(
         ),
         dbc.Row(
             [
-            dbc.Button("Generate", id="generate-button",
-                    className="mr-2", style=initial_hidden_style)
+                dbc.Button("Generate", id="generate-button",
+                           className="mr-2", style=initial_hidden_style)
             ], justify='center'
-            ),
+        ),
     ],
     body=True, className="mb-2"
 )
@@ -86,7 +87,7 @@ map_card = dbc.Card(
     [
         html.Div(id='map-div')
     ],
-   className="mb-2"
+    className="mb-2"
 )
 
 fig_card = dbc.Card(
@@ -117,19 +118,19 @@ fig_prec_card = dbc.Card(
 )
 
 
-help_card =  dbc.Card (  [
-        dbc.CardBody(
-            [
-                html.H4("Help", className="card-title"),
-            ]
-        ),
-    ],className="mb-1" )
+help_card = dbc.Card([
+    dbc.CardBody(
+        [
+            html.H4("Help", className="card-title"),
+        ]
+    ),
+], className="mb-1")
 
 
 app.layout = dbc.Container(
     [
         html.H1("Mosmix webapp"),
-        html.Div(id='garbage-output-0', style={'display':'none'}),
+        html.Div(id='garbage-output-0', style={'display': 'none'}),
         html.Hr(),
         dbc.Row(
             [
@@ -137,35 +138,38 @@ app.layout = dbc.Container(
                         controls,
                         map_card,
                         dbc.Checklist(
-                                    options=[
-                                        {"label": "Temperature details", "value": "time_series"},
-                                    ],
-                                    value=["time_series"],
-                                    id="switches-input-temp",
-                                    switch=True,
-                                ),
+                            options=[
+                                {"label": "Temperature details",
+                                 "value": "time_series"},
+                            ],
+                            value=["time_series"],
+                            id="switches-input-temp",
+                            switch=True,
+                        ),
                         dbc.Spinner(fig_card),
                         dbc.Checklist(
-                                    options=[
-                                        {"label": "Wind details", "value": "time_series"},
-                                    ],
-                                    value=[],
-                                    id="switches-input-wind",
-                                    switch=True,
-                                ),
+                            options=[
+                                {"label": "Wind details",
+                                 "value": "time_series"},
+                            ],
+                            value=[],
+                            id="switches-input-wind",
+                            switch=True,
+                        ),
                         dbc.Spinner(fig_wind_card),
                         dbc.Checklist(
                             options=[
-                                {"label": "Precipitation details", "value": "time_series"},
+                                {"label": "Precipitation details",
+                                    "value": "time_series"},
                             ],
                             value=[],
                             id="switches-input-prec",
                             switch=True,
                         ),
                         dbc.Spinner(fig_prec_card),
-                    ], sm=11, md=10, lg=8, xl=7, align='center')
+                        ], sm=11, md=10, lg=8, xl=7, align='center')
             ], justify='center'
-            )
+        )
     ],
     fluid=True,
     id='container',
@@ -205,6 +209,8 @@ def show_plots(n_clicks):
                 final_shown_style]
 
 # show plots when generate button has been pressed
+
+
 @app.callback(
     [Output("switches-input-temp", "style"),
      Output("switches-input-prec", "style"),
@@ -233,6 +239,8 @@ def show_plots(switch):
     else:
         return [initial_hidden_style]
 #
+
+
 @app.callback(
     [Output("prec-plot", "style")],
     [Input("switches-input-prec", "value")],
@@ -243,6 +251,8 @@ def show_plots(switch):
     else:
         return [initial_hidden_style]
 #
+
+
 @app.callback(
     [Output("temp-plot", "style")],
     [Input("switches-input-temp", "value")],
@@ -278,6 +288,8 @@ app.clientside_callback(
 )
 
 # generate map plot at loading AND when the location is updated
+
+
 @app.callback(
     [Output("map-div", "children")],
     [Input("generate-button", "n_clicks")],
@@ -291,7 +303,8 @@ def create_coords_and_map(n_clicks, from_address):
         if from_address is not None:
             mosmix_stations = get_stations()
             if 'value' in from_address:
-                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
+                sel_station = mosmix_stations[mosmix_stations.WMO_ID ==
+                                              from_address['value']]
             else:
                 sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
 
@@ -302,7 +315,7 @@ def create_coords_and_map(n_clicks, from_address):
             return utils.generate_map_plot(None)
 
 
-# generate the data and the plots when generate is pressed 
+# generate the data and the plots when generate is pressed
 # (we call get_stations and get_data in every function
 # but the parent functions are cached!)
 @app.callback(
@@ -320,7 +333,8 @@ def func(n_clicks, from_address, data_type):
             if from_address is not None:
                 mosmix_stations = get_stations()
                 if 'value' in from_address:
-                    sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
+                    sel_station = mosmix_stations[mosmix_stations.WMO_ID ==
+                                                  from_address['value']]
                 else:
                     sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
 
@@ -345,7 +359,8 @@ def func2(n_clicks, from_address, data_type):
         if from_address is not None:
             mosmix_stations = get_stations()
             if 'value' in from_address:
-                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
+                sel_station = mosmix_stations[mosmix_stations.WMO_ID ==
+                                              from_address['value']]
             else:
                 sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
 
@@ -370,7 +385,8 @@ def func3(n_clicks, from_address, data_type):
         if from_address is not None:
             mosmix_stations = get_stations()
             if 'value' in from_address:
-                sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address['value']]
+                sel_station = mosmix_stations[mosmix_stations.WMO_ID ==
+                                              from_address['value']]
             else:
                 sel_station = mosmix_stations[mosmix_stations.WMO_ID == from_address]
 
@@ -413,7 +429,7 @@ def get_closest_address(n_clicks, from_address):
 
 # get location with geolocation button
 @app.callback(
-    Output("from_address", "value"), 
+    Output("from_address", "value"),
     [Input("map", "location_lat_lon_acc")],
     prevent_initial_call=True)
 def update_location(location):
@@ -426,35 +442,35 @@ def update_location(location):
 @cache.memoize(3600)
 def get_data(station, data_type):
     if data_type == 'L':
-        mosmix_type = utils.DWDMosmixType.LARGE
+        mosmix_type = DwdMosmixType.LARGE
     elif data_type == 'S':
-        mosmix_type = utils.DWDMosmixType.SMALL
+        mosmix_type = DwdMosmixType.SMALL
 
-    mosmix = utils.DWDMosmixData(
-        station_ids=[station],
-        mosmix_type=mosmix_type,
-        humanize_parameters=True,
-        tidy_data=True
-    )
+    API = Wetterdienst(provider="dwd", kind="forecast")
 
-    for data in mosmix.query():
-        break
+    stations = API(parameter="large",
+                   mosmix_type=mosmix_type,
+                   humanize=True,
+                   tidy=True).filter_by_station_id(station_id=[station])
 
-    df = data.data
+    df = stations.values.all().df
+
     # remove categories
-    df.PARAMETER = df.PARAMETER.astype(str)
+    df.parameter = df.parameter.astype(str)
     # Do some units conversion
     params = ['TEMPERATURE_AIR_200', 'TEMPERATURE_DEW_POINT_200', 'TEMPERATURE_AIR_MAX_200',
               'TEMPERATURE_AIR_MIN_200', 'TEMPERATURE_AIR_005', 'TEMPERATURE_AIR_MIN_005_LAST_12H',
               "TEMPERATURE_AIR_200_LAST_24H"]
-    df.loc[df.PARAMETER.isin(params), 'VALUE'] = df.loc[df.PARAMETER.isin(params), 'VALUE'] - 273.15
-    # 
+    df.loc[df.parameter.isin(params), 'value'] = df.loc[df.parameter.isin(
+        params), 'value'] - 273.15
+    #
     params = ['WIND_SPEED', 'WIND_GUST_MAX_LAST_1H', 'WIND_GUST_MAX_LAST_3H',
               'WIND_GUST_MAX_LAST_12H']
-    df.loc[df.PARAMETER.isin(params), 'VALUE'] = df.loc[df.PARAMETER.isin(params), 'VALUE'] * 3.6
+    df.loc[df.parameter.isin(params), 'value'] = df.loc[df.parameter.isin(
+        params), 'value'] * 3.6
     #
-    df.loc[df.PARAMETER == 'PRESSURE_AIR_SURFACE_REDUCED', 'VALUE'] = \
-                df.loc[df.PARAMETER == 'PRESSURE_AIR_SURFACE_REDUCED', 'VALUE'] / 100.
+    df.loc[df.parameter == 'PRESSURE_AIR_SURFACE_REDUCED', 'value'] = \
+        df.loc[df.parameter == 'PRESSURE_AIR_SURFACE_REDUCED', 'value'] / 100.
 
     return df
 
@@ -476,8 +492,8 @@ def get_stations():
 def closest_point(data, point):
     p = 0.017453292519943295
     a = 0.5 - utils.np.cos((data['LAT']-point["lat"])*p)/2 + \
-              utils.np.cos(point["lat"]*p)*utils.np.cos(data['LAT']*p) * \
-              (1-utils.np.cos((data['LON']-point["lon"])*p)) / 2
+        utils.np.cos(point["lat"]*p)*utils.np.cos(data['LAT']*p) * \
+        (1-utils.np.cos((data['LON']-point["lon"])*p)) / 2
 
     dist = 12742 * utils.np.arcsin(utils.np.sqrt(a))
 
@@ -488,8 +504,8 @@ def closest_point(data, point):
 def closest_points(data, point):
     p = 0.017453292519943295
     a = 0.5 - utils.np.cos((data['LAT']-point["lat"])*p)/2 + \
-              utils.np.cos(point["lat"]*p)*utils.np.cos(data['LAT']*p) * \
-              (1-utils.np.cos((data['LON']-point["lon"])*p)) / 2
+        utils.np.cos(point["lat"]*p)*utils.np.cos(data['LAT']*p) * \
+        (1-utils.np.cos((data['LON']-point["lon"])*p)) / 2
 
     dist = 12742 * utils.np.arcsin(utils.np.sqrt(a))
     data['dist'] = dist
@@ -503,7 +519,7 @@ def get_place_address(place):
 
     url = "%s/%s.json?&access_token=%s" % (apiURL_places, place, utils.apiKey)
 
-    response = utils.requests.get(url)
+    response = requests.get(url)
     json_data = json.loads(response.text)
 
     place_name = json_data['features'][0]['place_name']
@@ -520,9 +536,10 @@ def get_place_address(place):
 def get_place_address_reverse(lon, lat):
     apiURL_places = "https://api.mapbox.com/geocoding/v5/mapbox.places"
 
-    url = "%s/%s,%s.json?&access_token=%s&country=DE&types=address" % (apiURL_places, lon, lat, utils.apiKey)
+    url = "%s/%s,%s.json?&access_token=%s&country=DE&types=address" % (
+        apiURL_places, lon, lat, utils.apiKey)
 
-    response = utils.requests.get(url)
+    response = requests.get(url)
     json_data = json.loads(response.text)
 
     place_name = json_data['features'][0]['place_name']
